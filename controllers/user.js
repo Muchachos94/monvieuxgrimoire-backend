@@ -4,18 +4,10 @@ const User = require('../models/User');
 
 const JWT_SECRET = process.env.JWT_SECRET;
 
-// Helpers simples
 const MIN_PASSWORD_LEN = 8;
 const normalizeEmail = (e = '') => String(e).trim().toLowerCase();
 const isEmail = (e = '') => /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(e);
 
-/**
- * Inscription d'un nouvel utilisateur.
- * - Vérifie présence/format email + longueur de mot de passe
- * - Normalise l'email (trim + lowercase) pour éviter les doublons "visuels"
- * - Hache le mot de passe avec bcrypt
- * - Gère proprement l'erreur de doublon (code 11000)
- */
 exports.signup = async (req, res) => {
   try {
     const { email, password } = req.body || {};
@@ -42,12 +34,6 @@ exports.signup = async (req, res) => {
   }
 };
 
-/**
- * Connexion d'un utilisateur existant.
- * - Normalise l'email
- * - Répond 401 si email inconnu ou mot de passe invalide (sans fuiter la raison exacte)
- * - Signe un JWT (24h) avec JWT_SECRET et renvoie { userId, token }
- */
 exports.login = async (req, res) => {
   try {
     const { email, password } = req.body || {};
