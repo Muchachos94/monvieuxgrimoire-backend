@@ -1,3 +1,4 @@
+const sharp = require('sharp');
 const multer = require('multer');
 const path = require('path');
 const fs = require('fs');
@@ -14,6 +15,27 @@ const MIME_TYPES = {
   'image/png': 'png',
   'image/webp': 'webp',
 };
+
+async function convertToWebp(inputPath) {
+  const dir  = path.dirname(inputPath);
+  const ext  = path.extname(inputPath).toLowerCase();
+  const base = path.basename(inputPath, ext);
+
+  if (ext === '.webp') {
+    return inputPath;
+  }
+
+  const outPath = path.join(dir, `${base}.webp`);
+
+  await sharp(inputPath)
+    .rotate()
+    .resize({ width: 1200, height: 1200, fit: 'inside', withoutEnlargement: true })
+    .webp({ quality: 80, effort: 5 })
+    .toFile(outPath);
+
+  if (outPath !== inputPath) fs.unlink(inputPath, () => {});
+  return outPath;
+}
 
 const storage = multer.diskStorage({
   destination: (req, file, cb) => {
@@ -41,8 +63,34 @@ const fileFilter = (req, file, cb) => {
   cb(ok ? null : new Error('Only JPG/JPEG/PNG/WEBP allowed'), ok);
 };
 
-module.exports = multer({
+const upload = multer({
   storage,
   fileFilter,
   limits: { fileSize: 20 * 1024 * 1024, files: 1 },
 }).single('image');
+
+
+module.exports = (req, res, next) => {
+  upload(req, res, async (err) => {
+    if (err) {
+      if (err instanceof multer.MulterError) {
+        return res.status(400).json({ message: err.message });
+      }
+      return res.status(400).json({ message: err.message || 'Upload invalide' });
+    }
+    if (!req.file) return next();
+
+    try {
+      const outPath = await convertToWebp(req.file.path);
+      req.file.path = outPath;
+      req.file.filename = path.basename(outPath);
+      req.file.mimetype = 'image/webp';
+      try {
+        req.file.size = fs.statSync(outPath).size;
+      } catch (_) {}
+      return next();
+    } catch (e) {
+      return res.status(400).json({ message: `Image illisible ou non supportée: ${e.message}` });
+    }
+  });
+};

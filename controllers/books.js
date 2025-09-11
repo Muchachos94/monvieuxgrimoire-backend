@@ -1,7 +1,6 @@
 const path = require('path');
 const fs = require('fs');
 const Book = require('../models/Book');
-const sharp = require('sharp');
 
 function computeAverage(ratings) {
   if (!Array.isArray(ratings) || ratings.length === 0) return 0;
@@ -16,26 +15,6 @@ function removeOldImage(imageUrl) {
   const fileName = imageUrl.slice(idx + '/images/'.length);
   const filePath = path.join(__dirname, '..', 'images', fileName);
   fs.unlink(filePath, () => {});
-}
-
-async function convertToWebp(inputPath) {
-  const dir  = path.dirname(inputPath);
-  const ext  = path.extname(inputPath).toLowerCase();
-  const base = path.basename(inputPath, ext);
-
-  if (ext === '.webp') {
-    return inputPath;
-  }
-  const outPath = path.join(dir, `${base}.webp`);
-
-  await sharp(inputPath)
-    .rotate()
-    .resize({ width: 1200, height: 1200, fit: 'inside', withoutEnlargement: true })
-    .webp({ quality: 80, effort: 5 })
-    .toFile(outPath);
-
-  if (outPath !== inputPath) fs.unlink(inputPath, () => {});
-  return outPath;
 }
 
 exports.createBook = async (req, res) => {
@@ -71,14 +50,7 @@ exports.createBook = async (req, res) => {
     delete bookObject._id;
     delete bookObject._userId;
 
-  let outPath;
-  try {
-    outPath = await convertToWebp(req.file.path);
-  } catch (e) {
-    return res.status(400).json({ message: `Image illisible ou non supportée: ${e.message}` });
-  }
-
-const imageUrl = `${req.protocol}://${req.get('host')}/images/${path.basename(outPath)}`;
+    const imageUrl = `${req.protocol}://${req.get('host')}/images/${req.file.filename}`;
 
     const book = new Book({
       ...bookObject,
@@ -117,10 +89,9 @@ exports.modifyBook = async (req, res) => {
       } catch {
         return res.status(400).json({ message: "Le champ 'book' doit être un JSON valide" });
       }
-      const outPath = await convertToWebp(req.file.path);
       updates = {
         ...parsed,
-        imageUrl: `${req.protocol}://${req.get('host')}/images/${path.basename(outPath)}`
+        imageUrl: `${req.protocol}://${req.get('host')}/images/${req.file.filename}`
       };
       hasNewImage = true;
     } else {
